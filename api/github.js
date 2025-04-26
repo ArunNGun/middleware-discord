@@ -186,24 +186,24 @@ export default async function handler(req, res) {
           logger.warn('DISCORD_WEBHOOK_URL not configured');
         }
       }
-      // If the event is neither an issue nor a pull request, send a generic message to Discord
-      if (process.env.DISCORD_WEBHOOK_URL) {
-        const eventType = req.headers['x-github-event'] || 'unknown';
-        const sender = payload.sender?.login || 'unknown';
-        const message = `📢 Received GitHub event: **${eventType}** from **${sender}**\n[View Repository](${payload.repository?.html_url || '#'})`;
+      // // If the event is neither an issue nor a pull request, send a generic message to Discord
+      // if (process.env.DISCORD_WEBHOOK_URL) {
+      //   const eventType = req.headers['x-github-event'] || 'unknown';
+      //   const sender = payload.sender?.login || 'unknown';
+      //   const message = `📢 Received GitHub event: **${eventType}** from **${sender}**\n[View Repository](${payload.repository?.html_url || '#'})`;
 
-        logger.info(`Sending generic Discord notification for event: ${eventType}`);
-        try {
-          const response = await axios.post(process.env.DISCORD_WEBHOOK_URL, {
-        content: message
-          });
-          logger.info(`Discord notification sent successfully, status: ${response.status}`);
-        } catch (discordError) {
-          logger.error('Failed to send generic Discord notification', discordError);
-        }
-      } else {
-        logger.warn('DISCORD_WEBHOOK_URL not configured');
-      }
+      //   logger.info(`Sending generic Discord notification for event: ${eventType}`);
+      //   try {
+      //     const response = await axios.post(process.env.DISCORD_WEBHOOK_URL, {
+      //   content: message
+      //     });
+      //     logger.info(`Discord notification sent successfully, status: ${response.status}`);
+      //   } catch (discordError) {
+      //     logger.error('Failed to send generic Discord notification', discordError);
+      //   }
+      // } else {
+      //   logger.warn('DISCORD_WEBHOOK_URL not configured');
+      // }
       logger.info('Webhook processed successfully');
       return res.status(200).end();
     } catch (error) {
