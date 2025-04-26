@@ -1,0 +1,9 @@
+{
+  "name": "middleware-discord-api",
+  "version": "1.0.0",
+  "description": "API functions for GitHub webhook to Discord notification service",
+  "type": "module",
+  "dependencies": {
+    "axios": "^1.6.2"
+  }
+}

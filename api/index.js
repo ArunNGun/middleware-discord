@@ -1,4 +1,5 @@
 // This file serves as the API root endpoint
+// Using ESM format for consistency with github.js
 export default function handler(req, res) {
   return res.status(200).json({
     name: "GitHub to Discord Notification Service",
