@@ -1,4 +1,10 @@
-const axios = require('axios');
+// Import axios using dynamic import to ensure compatibility with Vercel
+let axios;
+import('axios').then(module => {
+  axios = module.default;
+}).catch(err => {
+  console.error('Error importing axios:', err);
+});
 
 export default async function handler(req, res) {
   if (req.method === 'POST') {
