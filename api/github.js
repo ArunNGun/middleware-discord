@@ -1,13 +1,48 @@
 // Use ESM import for better compatibility with Vercel
 import axios from 'axios';
 
+// Simple logging utility with timestamps
+const logger = {
+  info: (message, data = null) => {
+    const timestamp = new Date().toISOString();
+    console.log(`[INFO] [${timestamp}] ${message}`, data ? data : '');
+  },
+  warn: (message, data = null) => {
+    const timestamp = new Date().toISOString();
+    console.warn(`[WARN] [${timestamp}] ${message}`, data ? data : '');
+  },
+  error: (message, error = null) => {
+    const timestamp = new Date().toISOString();
+    console.error(`[ERROR] [${timestamp}] ${message}`, error ? error : '');
+  },
+  debug: (message, data = null) => {
+    const timestamp = new Date().toISOString();
+    console.log(`[DEBUG] [${timestamp}] ${message}`, data ? data : '');
+  }
+};
+
 export default async function handler(req, res) {
+  logger.info(`Received ${req.method} request to ${req.url}`);
+  
+  // Log headers for debugging
+  logger.debug('Request headers:', req.headers);
+  
   if (req.method === 'POST') {
     try {
+      logger.info('Processing webhook payload');
       const payload = req.body;
+      
+      // Log event type
+      logger.debug('Webhook event:', {
+        event: req.headers['x-github-event'],
+        action: payload.action,
+        hasIssue: !!payload.issue,
+        hasPR: !!payload.pull_request
+      });
 
       // Handle issue events
       if (payload.issue) {
+        logger.info(`Processing issue event: ${payload.action}`);
         const issueTitle = payload.issue.title;
         const issueUrl = payload.issue.html_url;
         const action = payload.action;
@@ -59,18 +94,35 @@ export default async function handler(req, res) {
             message = `🔔 Issue ${action}\n**${issueTitle}**\n${assigneeText}\n[View Issue](${issueUrl})`;
         }
         
+        // Log the formatted message
+        logger.debug('Formatted issue message:', { message });
+        
         // Send notification to Discord
         if (process.env.DISCORD_WEBHOOK_URL && message) {
-          await axios.post(process.env.DISCORD_WEBHOOK_URL, {
-            content: message
-          });
+          logger.info(`Sending Discord notification for issue ${payload.issue.number}`);
+          try {
+            const response = await axios.post(process.env.DISCORD_WEBHOOK_URL, {
+              content: message
+            });
+            logger.info(`Discord notification sent successfully, status: ${response.status}`);
+          } catch (discordError) {
+            logger.error('Failed to send Discord notification for issue', discordError);
+          }
         } else if (!process.env.DISCORD_WEBHOOK_URL) {
-          console.warn('DISCORD_WEBHOOK_URL not configured');
+          logger.warn('DISCORD_WEBHOOK_URL not configured');
         }
       }
       
       // Handle pull request events
       if (payload.pull_request) {
+        logger.info(`Processing pull request event: ${payload.action}`);
+        logger.debug('Pull request details:', {
+          number: payload.pull_request.number,
+          title: payload.pull_request.title,
+          state: payload.pull_request.state,
+          merged: !!payload.pull_request.merged
+        });
+        
         const prTitle = payload.pull_request.title;
         const prUrl = payload.pull_request.html_url;
         const action = payload.action;
@@ -116,27 +168,79 @@ export default async function handler(req, res) {
             message = `🔔 Pull request ${action}\n**${prTitle}**\n[View PR](${prUrl})`;
         }
         
+        // Log the formatted message
+        logger.debug('Formatted PR message:', { message });
+        
         // Send notification to Discord
         if (process.env.DISCORD_WEBHOOK_URL && message) {
-          await axios.post(process.env.DISCORD_WEBHOOK_URL, {
-            content: message
-          });
+          logger.info(`Sending Discord notification for PR ${payload.pull_request.number}`);
+          try {
+            const response = await axios.post(process.env.DISCORD_WEBHOOK_URL, {
+              content: message
+            });
+            logger.info(`Discord notification sent successfully, status: ${response.status}`);
+          } catch (discordError) {
+            logger.error('Failed to send Discord notification for pull request', discordError);
+          }
         } else if (!process.env.DISCORD_WEBHOOK_URL) {
-          console.warn('DISCORD_WEBHOOK_URL not configured');
+          logger.warn('DISCORD_WEBHOOK_URL not configured');
         }
       }
+      // If the event is neither an issue nor a pull request, send a generic message to Discord
+      if (process.env.DISCORD_WEBHOOK_URL) {
+        const eventType = req.headers['x-github-event'] || 'unknown';
+        const sender = payload.sender?.login || 'unknown';
+        const message = `📢 Received GitHub event: **${eventType}** from **${sender}**\n[View Repository](${payload.repository?.html_url || '#'})`;
 
+        logger.info(`Sending generic Discord notification for event: ${eventType}`);
+        try {
+          const response = await axios.post(process.env.DISCORD_WEBHOOK_URL, {
+        content: message
+          });
+          logger.info(`Discord notification sent successfully, status: ${response.status}`);
+        } catch (discordError) {
+          logger.error('Failed to send generic Discord notification', discordError);
+        }
+      } else {
+        logger.warn('DISCORD_WEBHOOK_URL not configured');
+      }
+      logger.info('Webhook processed successfully');
       return res.status(200).end();
     } catch (error) {
-      console.error('Error processing webhook:', error);
-      return res.status(500).json({ error: 'Failed to process webhook' });
+      logger.error('Error processing webhook', error);
+      
+      // Log detailed error information
+      if (error.response) {
+        // The request was made and the server responded with a status code
+        // that falls out of the range of 2xx
+        logger.error('Error response data:', error.response.data);
+        logger.error('Error response status:', error.response.status);
+        logger.error('Error response headers:', error.response.headers);
+      } else if (error.request) {
+        // The request was made but no response was received
+        logger.error('No response received from server', error.request);
+      } else {
+        // Something happened in setting up the request that triggered an Error
+        logger.error('Error setting up request:', error.message);
+      }
+      
+      return res.status(500).json({
+        error: 'Failed to process webhook',
+        message: error.message
+      });
     }
   }
 
   // Add a simple health check for GET requests
   if (req.method === 'GET') {
-    return res.status(200).json({ status: 'ok' });
+    logger.info('Health check request received');
+    return res.status(200).json({
+      status: 'ok',
+      version: '1.0.0',
+      timestamp: new Date().toISOString()
+    });
   }
 
+  logger.warn(`Method not allowed: ${req.method}`);
   return res.status(405).json({ message: 'Method Not Allowed' });
 }
