@@ -1,10 +1,7 @@
 {
   "version": 2,
-  "routes": [
-    {
-      "src": "/github",
-      "dest": "/api/github.js"
-    }
+  "rewrites": [
+    { "source": "/github", "destination": "/api/github.js" }
   ],
   "headers": [
     {
